@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IOForge</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#1d2330;--mut:#667085;--line:#dde1e7;--acc:#1f6feb;--err:#c62828;--errbg:#fdecec;--warn:#9a6700;--warnbg:#fff6dc;--ok:#1a7f37}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1218;--card:#171b23;--fg:#e6e9ef;--mut:#98a2b3;--line:#2a303b;--acc:#4c8dff;--err:#ff6b6b;--errbg:#3a1d1d;--warn:#e3b341;--warnbg:#3a3015;--ok:#3fb950}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans",sans-serif}
+header{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+header h1{margin:0;font-size:20px}header span{color:var(--mut)}
+main{max-width:1200px;margin:0 auto;padding:16px;display:grid;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+.card h2{margin:0 0 10px;font-size:15px}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:24px;text-align:center;color:var(--mut);cursor:pointer}
+.drop.over{border-color:var(--acc);color:var(--acc)}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--acc);color:#fff;border:0;border-radius:6px;padding:7px 12px;cursor:pointer}
+button.sec{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+button:disabled{opacity:.4;cursor:default}
+select,input[type=text],input[type=number]{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 7px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.grid label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mut)}
+.stats{display:flex;gap:10px;flex-wrap:wrap}.stat{padding:8px 12px;border:1px solid var(--line);border-radius:8px;min-width:80px}.stat b{display:block;font-size:20px}
+.tbl{overflow:auto;max-height:420px;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--card)}tr.e td{background:var(--errbg)}tr.w td{background:var(--warnbg)}
+.lvl-error{color:var(--err);font-weight:600}.lvl-warn{color:var(--warn);font-weight:600}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.mut{color:var(--mut)}code{font-size:12px}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;max-height:260px;overflow:auto;font-size:12px}
+.tabs button{background:transparent;color:var(--mut);border:1px solid var(--line)}.tabs button.on{color:var(--fg);border-color:var(--acc)}
+</style>
+</head>
+<body>
+<header><h1>IOForge</h1><span>IO表 → Studio 5000 / TIA Portal のタグ・バッファロジック・ループチェック表を一括生成。データはブラウザ外に出ません。</span></header>
+<main>
+<section class="card">
+  <h2>1. IO表を読み込む (.xlsx / .csv / 貼り付け)</h2>
+  <div id="drop" class="drop">ここにファイルをドロップ、またはクリックして選択<input id="file" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls" hidden></div>
+  <div class="row" style="margin-top:8px">
+    <button class="sec" id="loadSample">サンプルを読み込む</button>
+    <button class="sec" id="togglePaste">Excelから貼り付け</button>
+    <span class="mut" id="srcInfo"></span>
+  </div>
+  <div id="pasteBox" hidden style="margin-top:8px">
+    <textarea id="paste" rows="6" style="width:100%;font:12px monospace" placeholder="Excelで範囲をコピーしてここに貼り付け (1行目は見出し)"></textarea>
+    <button id="usePaste">貼り付けを使う</button>
+  </div>
+</section>
+
+<section class="card" id="mapCard" hidden>
+  <h2>2. 列の割り当て</h2>
+  <div class="grid" id="mapGrid"></div>
+</section>
+
+<section class="card" id="setCard" hidden>
+  <h2>3. 設定</h2>
+  <div class="grid">
+    <label>Controller名<input type="text" id="s_controller" value="PLC"></label>
+    <label>Program名<input type="text" id="s_program" value="MainProgram"></label>
+    <label>Routine名<input type="text" id="s_routine" value="IO_Buffer"></label>
+    <label>TIA タグテーブル名<input type="text" id="s_table" value="IO"></label>
+  </div>
+  <p class="mut" style="margin:10px 0 4px">Logix アドレステンプレート（{slot} {point}）</p>
+  <div class="grid">
+    <label>DI<input type="text" id="t_DI"></label><label>DO<input type="text" id="t_DO"></label>
+    <label>AI<input type="text" id="t_AI"></label><label>AO<input type="text" id="t_AO"></label>
+  </div>
+  <p class="mut" style="margin:10px 0 4px">S7 自動アドレス（アドレス列が無い行のみ）</p>
+  <div class="grid">
+    <label>種別ごとに詰める<input type="checkbox" id="k_pack" checked title="ON: k番目のDIカード/AIカード…で連番。OFF: スロット位置そのまま"></label>
+    <label>先頭スロット番号（詰めない時）<input type="number" id="k_firstSlot"></label>
+    <label>DI 開始バイト<input type="number" id="k_diStartByte"></label>
+    <label>DO 開始バイト<input type="number" id="k_doStartByte"></label>
+    <label>AI 開始バイト<input type="number" id="k_aiStartByte"></label>
+    <label>AO 開始バイト<input type="number" id="k_aoStartByte"></label>
+    <label>デジタル: バイト/スロット<input type="number" id="k_digitalBytesPerSlot"></label>
+    <label>アナログ: バイト/スロット<input type="number" id="k_analogBytesPerSlot"></label>
+  </div>
+  <p class="mut" style="margin:10px 0 4px">データ型の既定値（データ型列が空の行）</p>
+  <div class="grid">
+    <label>DI<input type="text" id="d_DI"></label><label>DO<input type="text" id="d_DO"></label>
+    <label>AI<input type="text" id="d_AI"></label><label>AO<input type="text" id="d_AO"></label>
+  </div>
+</section>
+
+<section class="card" id="resCard" hidden>
+  <h2>4. チェック結果</h2>
+  <div class="stats" id="stats"></div>
+  <div class="row tabs" style="margin:10px 0">
+    <button id="tabIssues" class="on">問題一覧</button><button id="tabPoints">全点プレビュー</button>
+  </div>
+  <div class="tbl" id="tbl"></div>
+</section>
+
+<section class="card" id="outCard" hidden>
+  <h2>5. 出力（エラー行は該当プラットフォームの出力から除外）</h2>
+  <div class="row">
+    <button id="o_l5x">Studio 5000: バッファRoutine (.L5X)</button>
+    <button id="o_csv">Studio 5000: タグCSV</button>
+    <button id="o_alias" class="sec">Studio 5000: Aliasタグ CSV</button>
+    <button id="o_tia">TIA Portal: PLCタグ表 (.xlsx)</button>
+    <button id="o_loop" class="sec">ループチェック表 (.csv)</button>
+  </div>
+  <p class="mut">L5X: Program を右クリック → Import Routine。タグCSV: Tools → Import → Tags and Logic Comments。TIA: PLC tags → タグテーブルを開いて Import。</p>
+  <pre id="preview"></pre>
+</section>
+</main>
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

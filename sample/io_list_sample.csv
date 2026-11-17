@@ -1,0 +1,18 @@
+Tag,Description,IO Type,Slot,Point,Data Type,Device
+LS_101,Tank 101 high level switch,DI,1,0,,LSH-101
+LS_102,Tank 101 low level switch,DI,1,1,,LSL-102
+PB_Start,Start pushbutton,DI,1,2,,HS-001
+PB_Stop,Stop pushbutton,DI,1,3,,HS-002
+ES_Main,Main E-stop healthy,DI,1,4,,ES-001
+M101_Run_FB,Pump 101 run feedback,DI,1,5,,M-101
+M101_Run_Cmd,Pump 101 run command,DO,2,0,,M-101
+XV101_Open,Inlet valve 101 open,DO,2,1,,XV-101
+Horn,Alarm horn,DO,2,2,,AH-001
+LT_101,Tank 101 level,AI,3,0,,LT-101
+PT_102,Discharge pressure,AI,3,1,,PT-102
+FT_103,Flow,AI,3,2,,FT-103
+FCV_104_SP,Flow control valve output,AO,4,0,,FCV-104
+2nd_Pump,Bad name (starts with digit),DI,1,6,,
+LS_101,Duplicate of row 2,DI,1,7,,
+TT_105,Temp (bad type),AI,3,3,BOOL,TT-105
+Spare_1,,Digital Input,1,8,,
